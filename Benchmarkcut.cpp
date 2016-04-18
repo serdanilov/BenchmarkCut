@@ -1,5 +1,3 @@
-
-
 #include<opencv2/core/core.hpp>
 #include<opencv2/highgui/highgui.hpp>
 #include<opencv2/imgproc/imgproc.hpp>
@@ -7,6 +5,10 @@
 #include <iostream>
 #include <opencv2/videoio.hpp>
 
+enum my_Algorythm
+{
+	VIDEO_CAPTURE_BY_STEP = 1, CV_CAPTURE_EVERY_FRAME = 2
+};
 bool cut = true;
 void my_Exit();
 cv::Mat createOne(std::vector<cv::Mat> & images, int cols, int min_gap_size);
@@ -14,53 +16,47 @@ double BM_length(char* pass);
 
 int main(int argc, char** argv)
 {
-	char* pass_filename = argv[1];
+	my_Algorythm alg = VIDEO_CAPTURE_BY_STEP; //VIDEO_CAPTURE_BY_STEP; //CV_CAPTURE_EVERY_FRAME;//
 	
+	char* pass_filename = argv[1];
 	//std::cout << pass_filename << std::endl;
 
 	if (argc < 2) pass_filename = "test.mp4";
-
-
-	CvCapture* capture = cvCaptureFromFile(pass_filename);
-	double my_length = cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_COUNT);
-	cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 352);
-	cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 288);
-
 	std::string my_filename = "test";
-
-	/*double length = BM_length(pass_filename); //another way to check length
-
-	printf("Your video length is ");
-	printf("%d", int(length));
-	printf(" frames \n");
-	*/
-	printf("Your video length is ");
-	printf("%d", int(my_length));
-	printf(" frames \n");
-
-
-	// Get one frame
-	IplImage* frame = nullptr;
-
-	uint my_frame = int(my_length) / 16;  //capture every my_frame frames
-
-	printf("Images will be cut every ");
-	printf("%d", my_frame);
-	printf(" frames \n");
-
-	std::vector<cv::Mat> test_framelist; // container for all captured frames
-
-										 
-	if (cut)
+	
+	switch (alg) {
+			case VIDEO_CAPTURE_BY_STEP:
 	{
+		cv::VideoCapture myvid;
+		myvid.open(pass_filename);
 
-		for (uint j = 1; j <= 16; j++)
+		if (!myvid.isOpened()) {
+			printf("Capture not open \n");
+		}
+
+		std::vector<cv::Mat> NEW_framelist;
+		cv::Mat NEW_frame;
+		double x_length = myvid.get(CV_CAP_PROP_FRAME_COUNT);
+
+		printf("Your video length is ");
+		printf("%d", int(x_length));
+		printf(" frames \n");
+
+		uint each_frame = uint(x_length) / 16;
+
+		printf("Images will be cut every ");
+		printf("%d", each_frame);
+		printf(" frames \n");
+		
+		for (uint j = 1, current_frame = 1; (current_frame < x_length) && (j <= 16); current_frame += each_frame, j++)
 		{
-			for (uint i = 1; i < my_frame; i++)
-			{
+			myvid.set(CV_CAP_PROP_POS_FRAMES, current_frame);	
+			myvid.read(NEW_frame); //myvid >> NEW_frame;
+			NEW_framelist.push_back(NEW_frame);
 
-				frame = cvQueryFrame(capture);
-			}
+			printf("Image # ");
+			printf("%d", j);
+			printf(" captured ");
 
 			std::stringstream frameNum; //generating name for saved images
 			frameNum << j;
@@ -69,33 +65,96 @@ int main(int argc, char** argv)
 			my_filename += frameNum.str();
 			my_filename += ".jpg";
 
-			test_framelist.push_back(cv::cvarrToMat(frame, true));
-			printf("Image # ");
-			printf("%d", j);
-			printf(" captured ");
-			//IplImage* RGB_frame = frame;
-			//cvCvtColor(frame,RGB_frame,CV_YCrCb2BGR);
-			//cvWaitKey(1000);
-			cvSaveImage(my_filename.c_str(), frame);
-			//cvSaveImage("cam.jpg" ,RGB_frame);
+			cv::imwrite(my_filename.c_str(), NEW_frame);
 			my_filename = "test";
 			printf(" and Image # ");
 			printf("%d", j);
 			printf(" saved \n");
 		}
-	}
-	//cvWaitKey(10);
+		myvid.release();
+		cv::imwrite("yourcollage.jpg", createOne(NEW_framelist, 4, 5));
+		break;
 
-	// Release the capture device housekeeping
-	cvReleaseCapture(&capture);
-	//cvDestroyWindow( "mywindow" );
+	} // closing VIDEO_CAPTURE_BY_STEP case
 
-	cv::imwrite("yourcollage.jpg", createOne(test_framelist, 4, 1));
+	case CV_CAPTURE_EVERY_FRAME:
+	{	
+		CvCapture* capture = cvCaptureFromFile(pass_filename);
+		double my_length = cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_COUNT);
+		cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 352);
+		cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 288);
+
+		std::string my_filename = "test";
+
+		/*double length = BM_length(pass_filename); //another way to check length
+		printf("Your video length is ");
+		printf("%d", int(length));
+		printf(" frames \n");*/
+
+		printf("Your video length is ");
+		printf("%d", int(my_length));
+		printf(" frames \n");
+
+		// Get one frame
+		IplImage* frame = nullptr;
+
+		uint my_frame = int(my_length) / 16;  //capture every my_frame frames
+
+		printf("Images will be cut every ");
+		printf("%d", my_frame);
+		printf(" frames \n");
+
+		std::vector<cv::Mat> test_framelist; // container for all captured frames
+			//	if (cut) {
+				for (uint j = 1; j <= 16; j++)
+			{
+				for (uint i = 1; i < my_frame - 1; i++)
+				{
+
+					frame = cvQueryFrame(capture);
+				}
+
+				std::stringstream frameNum; //generating name for saved images
+				frameNum << j;
+				if (j <= 9)
+					my_filename += "0";
+				my_filename += frameNum.str();
+				my_filename += ".jpg";
+
+				test_framelist.push_back(cv::cvarrToMat(frame, true));
+				printf("Image # ");
+				printf("%d", j);
+				printf(" captured ");
+				//IplImage* RGB_frame = frame;
+				//cvCvtColor(frame,RGB_frame,CV_YCrCb2BGR);
+				//cvWaitKey(1000);
+				cvSaveImage(my_filename.c_str(), frame);
+				//cvSaveImage("cam.jpg" ,RGB_frame);
+				my_filename = "test";
+				printf(" and Image # ");
+				printf("%d", j);
+				printf(" saved \n");
+			}
+			//	}
+				//cvWaitKey(10);
+
+				// Release the capture device housekeeping
+			cvReleaseCapture(&capture);
+			//cvDestroyWindow( "mywindow" );
+
+			cv::imwrite("your_frame_collage.jpg", createOne(test_framelist, 4, 5));
+			break;
+		
+	} //closing CV_CAPTURE_EVERY_FRAME case
+	
+	default:
+		printf("please specify algorythm!");
+	} // closing switch
 
 	my_Exit();
 
 	return 0;
-}
+	}
 
 
 
@@ -110,8 +169,7 @@ double BM_length(char* pass) //another method to check length
 	if (!myvid.isOpened()) {
 		printf("Capture not open \n");
 	}
-
-
+	
 
 	double x = myvid.get(CV_CAP_PROP_FRAME_COUNT);
 
@@ -119,14 +177,18 @@ double BM_length(char* pass) //another method to check length
 }
 
 
-//while (True) :
-//	# Capture frame - by - frame
-//	ret, frame = video_capture.read()
-//	if not ret:
-//break
-//
-//count += 1
-
+/*void f_alternative()
+{
+	cv::VideoCapture myvid;
+	myvid.open("test2.avi");
+	std::vector<cv::Mat> new_frame;
+	//bool cv::VideoCapture::retrieve(OutputArray image, int flag = 0)
+	for ( uint i = 0; i<30;i++)
+	myvid.retrieve(new_frame[i], 30);
+		
+		myvid.set(CV_CAP_PROP_POS_FRAMES, 30);
+}
+*/
 
 void my_Exit()
 {
@@ -136,7 +198,6 @@ void my_Exit()
 	cout << "Press Enter key to close the programm ..." << endl;
 	cin.get();
 }
-
 
 cv::Mat createOne(std::vector<cv::Mat> & images, int cols, int min_gap_size) //thanks to Guanta on opencv.org
 {
